@@ -1,0 +1,8 @@
+[package]
+name = "randocli"
+version = "0.1.0"
+authors = ["Thomas Backmark <total@viskos.org>"]
+edition = "2018"
+
+[dependencies]
+randolib = { path = "../randolib" }

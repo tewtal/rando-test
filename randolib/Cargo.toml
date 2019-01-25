@@ -1,0 +1,13 @@
+[package]
+name = "randolib"
+version = "0.1.0"
+authors = ["Thomas Backmark <total@viskos.org>"]
+edition = "2018"
+
+[dependencies]
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+walkdir = "*"
+simple-error = "*"
+measure_time = "0.6"
