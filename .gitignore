@@ -1,3 +1,4 @@
 randocli/target
 randolib/target
+sm-json-data
 **/*.rs.bk

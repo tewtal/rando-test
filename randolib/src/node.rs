@@ -1,7 +1,7 @@
 use serde_derive::{Serialize,Deserialize};
 use crate::sparking::Sparking;
 use crate::requirement::Requirement;
-
+use crate::region::Note;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Node
@@ -16,7 +16,7 @@ pub struct Node
     pub unlock: Option<Requirement>,
     pub view: Option<Requirement>,
     pub yields: Option<Vec<String>>,
-    pub note: Option<String>
+    pub note: Option<Note>
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]

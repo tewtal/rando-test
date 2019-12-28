@@ -12,10 +12,18 @@ pub struct Region
     pub name: String,
     pub area: String,
     pub subarea: String,
-    pub note: Option<String>,
+    pub note: Option<Note>,
     pub nodes: Vec<Node>,
     pub links: Vec<Link>
 }
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[serde(untagged)]
+pub enum Note
+{
+    Note(String),
+    Notes(Vec<String>)
+} 
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RegionFile

@@ -1,5 +1,6 @@
 use serde_derive::{Serialize, Deserialize};
 use crate::requirement::Requirement;
+use crate::region::Note;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Sparking
@@ -13,7 +14,7 @@ pub struct Runway
 {
     pub length: i64,
     pub requires: Option<Requirement>,
-    pub note: Option<String>
+    pub note: Option<Note>
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]

@@ -5,15 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(Windows) Launch",
-            "type": "cppvsdbg",
+            "type": "lldb",
             "request": "launch",
-            "program": "randocli/target/debug/randocli.exe",
+            "name": "Debug",
+            "program": "${workspaceFolder}/randocli/target/debug/randocli.exe",
             "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": true
+            "cwd": "${workspaceFolder}/randocli",
+            "sourceLanguages": ["rust"]
         }
     ]
 }
