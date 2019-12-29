@@ -1,7 +1,7 @@
 use crate::region::Region;
 use crate::node::{Node, NodeType};
 use crate::world::World;
-use crate::link::{LinkTo};
+use crate::link::{LinkTo, Strat};
 use std::collections::HashSet;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -21,14 +21,14 @@ impl<'a> Location<'a>
         let locations = Location::visit_node(items, world, from_region, from_node, &mut visited_nodes).unwrap();
 
 
-        let mut unvisited_nodes: Vec<String> = Vec::new();
-        for region in &world.regions {
-            for node in &region.nodes {
-                if !visited_nodes.contains(&(region.id, node.id)) {
-                    unvisited_nodes.push(format!("{} - {}\n", region.name, node.name));
-                }
-            }
-        }
+        // let mut unvisited_nodes: Vec<String> = Vec::new();
+        // for region in &world.regions {
+        //     for node in &region.nodes {
+        //         if !visited_nodes.contains(&(region.id, node.id)) {
+        //             unvisited_nodes.push(format!("{} - {}\n", region.name, node.name));
+        //         }
+        //     }
+        // }
 
         // print!("Unvisited nodes:\n");
         // for uv in unvisited_nodes {
@@ -39,7 +39,8 @@ impl<'a> Location<'a>
     }
 
     fn visit_node(items: &HashSet<String>, world: &'a World, region: &'a Region, node: &'a Node, visited_nodes: &mut Vec<(i64, i64)>) -> Option<Vec<Location<'a>>>
-    {      
+    {
+        //print!("Visisting {}: {}\n", &region.name, &node.name);
         visited_nodes.push((region.id, node.id));
 
         let mut locations: Vec<Location> = Vec::new();
@@ -93,7 +94,7 @@ impl<'a> Location<'a>
                 {
                     if !visited_nodes.contains(&(region.id, link_node.id))
                     {
-                        if Location::can_traverse(items, &link)
+                        if Location::can_traverse(items, &link) && Location::can_access(items, &link_node)
                         {
                             if let Some(mut new_locations) = Location::visit_node(items, world, region, link_node, visited_nodes)
                             {
@@ -115,21 +116,60 @@ impl<'a> Location<'a>
         }
     }
 
-    fn can_traverse(items: &HashSet<String>, link: &LinkTo) -> bool
+    fn can_access(items: &HashSet<String>, node: &Node) -> bool
     {
-        if let Some(strats) = &link.strats
-        {
-            for strat in strats
-            {
-                if let Some(req) = &strat.requires
+        (match &node.interactionRequires {
+            Some(r) => r.check(items),
+            None => true
+        } &&
+        match &node.locks {
+            Some(locks) => locks.iter().all(|lock|
+                match &lock.lock
                 {
-                    if !req.check(items)
-                    {
-                        return false;
+                    Some(_r) => true,
+                    None => {
+                        (match &lock.unlockStrats {
+                            Some(us) => us.iter().any(|s| Location::can_do_strat(items, s)),
+                            None => true
+                        } ||
+                        match &lock.bypassStrats {
+                            Some(bs) => bs.iter().any(|s| Location::can_do_strat(items, s)),
+                            None => false
+                        })
                     }
                 }
-            }
+            ),
+            None => true
+        })
+    }
+
+    fn can_traverse(items: &HashSet<String>, link: &LinkTo) -> bool
+    {        
+        match &link.strats {
+            Some(strats) => strats.iter().any(|s| Location::can_do_strat(items, s)),
+            None => true
         }
-        true
+    }
+
+    fn can_do_strat(items: &HashSet<String>, strat: &Strat) -> bool
+    {
+        (match &strat.requires {
+            Some(r) => r.check(items),
+            None => true
+        } && match &strat.obstacles {
+            Some(ob) => {
+                ob.iter().any(|o| 
+                    match &o.requires {
+                        Some(r) => r.check(items),
+                        None => true
+                    } || 
+                    match &o.bypass {
+                        Some(b) => b.check(items),
+                        None => false
+                    }
+                )                                
+            },
+            None => true
+        })
     }
 }

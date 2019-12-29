@@ -1,7 +1,7 @@
 use serde_derive::{Serialize,Deserialize};
 use crate::sparking::{CanComeInCharged, CanShineCharge, AdjacentRunway};
 use crate::node::CanVisitNode;
-use crate::link::{EnemyDamage, ResetRoom, Ammo, EnemyKill};
+use crate::link::{EnemyDamage, ResetRoom, Ammo, EnemyKill, AmmoDrain};
 use std::collections::HashSet;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -24,9 +24,11 @@ pub enum Requirement
     HeatFrames { heatFrames: i64 },
     AcidFrames { acidFrames: i64 },
     LavaFrames { lavaFrames: i64 },
+    DraygonElectricityFrames { draygonElectricityFrames: i64 },
     HibashiHits { hibashiHits: i64 },
     EnergyAtMost { energyAtMost: i64 },
     PreviousStratProperty { previousStratProperty: String },
+    AmmoDrain { ammoDrain: AmmoDrain },
     And(Vec<Requirement>),
     Req(String),
     None
@@ -41,7 +43,7 @@ impl Requirement
             Requirement::ExplicitAnd { and: reqs} => reqs.iter().all(|r| r.check(items)),
             Requirement::Not { not: reqs } => !reqs.iter().any(|r| r.check(items)),
             Requirement::AdjacentRunway { adjacentRunway: _a} => true,
-            Requirement::CanShineCharge { canShineCharge: _cs } => false,
+            Requirement::CanShineCharge { canShineCharge: _cs } => items.contains("SpeedBooster"),
             Requirement::CanComeInCharged { canComeInCharged: _c } => false,
             Requirement::CanVisitNode { canVisitNode: _cv } => true,
             Requirement::EnemyDamage { enemyDamage: _ed } => true,
@@ -53,17 +55,18 @@ impl Requirement
             Requirement::HeatFrames { heatFrames: _h } => true,
             Requirement::AcidFrames { acidFrames: _a } => true,
             Requirement::LavaFrames { lavaFrames: _l } => true,
+            Requirement::DraygonElectricityFrames { draygonElectricityFrames: _d } => true,
             Requirement::EnergyAtMost { energyAtMost: _e } => true,
             Requirement::HibashiHits { hibashiHits: _h } => true,
             Requirement::PreviousStratProperty { previousStratProperty: _p } => true,
+            Requirement::AmmoDrain { ammoDrain: _a } => true,
             Requirement::And(reqs) => { reqs.iter().all(|r| r.check(items)) },
             Requirement::Req(r) => { 
-                // let ok = items.contains(r);
+                let ok = items.contains(r);
                 // if !ok {
-                //     print!("Unsatisified requirement: {}\n", r);
+                //     print!("Unmet requirement: {}\n", r);
                 // }
-                // ok
-                items.contains(r)
+                ok
             },
             Requirement::None => true
         }

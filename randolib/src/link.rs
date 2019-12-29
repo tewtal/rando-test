@@ -26,7 +26,16 @@ pub struct Strat
     pub name: String,
     pub notable: bool,
     pub requires: Option<Requirement>,
+    pub obstacles: Option<Vec<Obstacle>>,
     pub note: Option<Note>
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct Obstacle
+{
+    pub id: Option<String>,
+    pub requires: Option<Requirement>,
+    pub bypass: Option<Requirement>
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
@@ -47,6 +56,13 @@ pub struct ResetRoom
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Ammo
+{
+    pub r#type: String,
+    pub count: i64
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+pub struct AmmoDrain
 {
     pub r#type: String,
     pub count: i64

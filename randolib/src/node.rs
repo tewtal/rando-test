@@ -2,6 +2,7 @@ use serde_derive::{Serialize,Deserialize};
 use crate::sparking::Sparking;
 use crate::requirement::Requirement;
 use crate::region::Note;
+use crate::link::Strat;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Node
@@ -11,12 +12,20 @@ pub struct Node
     pub nodeType: Option<NodeType>,
     pub nodeSubType: Option<NodeSubType>,
     pub nodeItem: Option<String>,
-    pub requires: Option<Requirement>,
+    pub interactionRequires: Option<Requirement>,
     pub sparking: Option<Sparking>,
-    pub unlock: Option<Requirement>,
+    pub locks: Option<Vec<Lock>>,
     pub view: Option<Requirement>,
     pub yields: Option<Vec<String>>,
     pub note: Option<Note>
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Lock
+{
+    pub lock: Option<Requirement>,
+    pub unlockStrats: Option<Vec<Strat>>,
+    pub bypassStrats: Option<Vec<Strat>>
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
