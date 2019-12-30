@@ -3,6 +3,7 @@ use crate::sparking::{CanComeInCharged, CanShineCharge, AdjacentRunway};
 use crate::node::CanVisitNode;
 use crate::link::{EnemyDamage, ResetRoom, Ammo, EnemyKill, AmmoDrain};
 use std::collections::HashSet;
+use crate::location::State;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 #[serde(untagged)]
@@ -36,12 +37,12 @@ pub enum Requirement
 
 impl Requirement
 {
-    pub fn check(&self, items: &HashSet<String>) -> bool
+    pub fn check(&self, items: &HashSet<String>, state: &State) -> bool
     {
         match self {
-            Requirement::Or { or: reqs } => reqs.iter().any(|r| r.check(items)),
-            Requirement::ExplicitAnd { and: reqs} => reqs.iter().all(|r| r.check(items)),
-            Requirement::Not { not: reqs } => !reqs.iter().any(|r| r.check(items)),
+            Requirement::Or { or: reqs } => reqs.iter().any(|r| r.check(items, state)),
+            Requirement::ExplicitAnd { and: reqs} => reqs.iter().all(|r| r.check(items, state)),
+            Requirement::Not { not: reqs } => !reqs.iter().any(|r| r.check(items, state)),
             Requirement::AdjacentRunway { adjacentRunway: _a} => true,
             Requirement::CanShineCharge { canShineCharge: _cs } => items.contains("SpeedBooster"),
             Requirement::CanComeInCharged { canComeInCharged: _c } => false,
@@ -60,14 +61,8 @@ impl Requirement
             Requirement::HibashiHits { hibashiHits: _h } => true,
             Requirement::PreviousStratProperty { previousStratProperty: _p } => true,
             Requirement::AmmoDrain { ammoDrain: _a } => true,
-            Requirement::And(reqs) => { reqs.iter().all(|r| r.check(items)) },
-            Requirement::Req(r) => { 
-                let ok = items.contains(r);
-                // if !ok {
-                //     print!("Unmet requirement: {}\n", r);
-                // }
-                ok
-            },
+            Requirement::And(reqs) => { reqs.iter().all(|r| r.check(items, state)) },
+            Requirement::Req(r) => items.contains(r) || state.events.contains(r),
             Requirement::None => true
         }
     }

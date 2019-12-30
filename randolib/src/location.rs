@@ -2,7 +2,28 @@ use crate::region::Region;
 use crate::node::{Node, NodeType};
 use crate::world::World;
 use crate::link::{LinkTo, Strat};
-use std::collections::HashSet;
+use std::collections::{HashSet};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct State
+{
+    pub events: HashSet<String>,
+    pub obstacles: HashSet<(i64, String)>,
+    pub nodes: HashSet<(i64, i64)>
+}
+
+impl State
+{
+    pub fn new() -> State
+    {
+        State
+        {
+            events: HashSet::new(),
+            obstacles: HashSet::new(),
+            nodes: HashSet::new()
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Location<'a>
@@ -16,9 +37,19 @@ impl<'a> Location<'a>
 {
     pub fn available(items: &HashSet<String>, world: &'a World, from_region: &'a Region, from_node: &'a Node) -> Option<Vec<Location<'a>>>
     {
+        let mut state = State::new();
+        let mut locations = Vec::new();
+        let mut oldEvents = 0;
+        let mut pass = 1;
         
-        let mut visited_nodes: Vec<(i64, i64)> = Vec::new();
-        let locations = Location::visit_node(items, world, from_region, from_node, &mut visited_nodes).unwrap();
+        while pass == 1 || state.events.len() > oldEvents {
+            print!("Pass: {}\n", pass);
+            oldEvents = state.events.len();
+            pass += 1;
+            locations = Location::visit_node(items, world, from_region, from_node, &mut state).unwrap_or(Vec::new());
+            state.nodes = HashSet::new();
+            print!("Found {:?} locations and {:?} events {:?}\n", &locations.len(), &state.events.len(), &state.events);
+        }
 
 
         // let mut unvisited_nodes: Vec<String> = Vec::new();
@@ -38,10 +69,15 @@ impl<'a> Location<'a>
         Some(locations)
     }
 
-    fn visit_node(items: &HashSet<String>, world: &'a World, region: &'a Region, node: &'a Node, visited_nodes: &mut Vec<(i64, i64)>) -> Option<Vec<Location<'a>>>
+    fn visit_node(items: &HashSet<String>, world: &'a World, region: &'a Region, node: &'a Node, state: &mut State) -> Option<Vec<Location<'a>>>
     {
-        //print!("Visisting {}: {}\n", &region.name, &node.name);
-        visited_nodes.push((region.id, node.id));
+        //print!("Visiting {}: {}\n", &region.name, &node.name);
+        state.nodes.insert((region.id, node.id));
+        if let Some(yields) = &node.yields
+        {
+            state.events.extend(yields.iter().map(|y| y.to_string()));
+            //dbg!(&state.events);
+        }
 
         let mut locations: Vec<Location> = Vec::new();
 
@@ -71,9 +107,9 @@ impl<'a> Location<'a>
                         {
                             if let Some(target_node) = target_region.nodes.iter().find(|n| n.id == connection_node.nodeid)
                             {
-                                if !visited_nodes.contains(&(target_region.id, target_node.id))
+                                if !state.nodes.contains(&(target_region.id, target_node.id))
                                 {
-                                    if let Some(mut new_locations) = Location::visit_node(items, world, target_region, target_node, visited_nodes)
+                                    if let Some(mut new_locations) = Location::visit_node(items, world, target_region, target_node, state)
                                     {
                                         locations.append(&mut new_locations);
                                     }
@@ -92,11 +128,11 @@ impl<'a> Location<'a>
             {
                 if let Some(link_node) = region.nodes.iter().find(|n| n.id == link.id)
                 {
-                    if !visited_nodes.contains(&(region.id, link_node.id))
+                    if !state.nodes.contains(&(region.id, link_node.id))
                     {
-                        if Location::can_traverse(items, &link) && Location::can_access(items, &link_node)
+                        if Location::can_traverse(items, region, &link, state) && Location::can_access(items, region, &link_node, state)
                         {
-                            if let Some(mut new_locations) = Location::visit_node(items, world, region, link_node, visited_nodes)
+                            if let Some(mut new_locations) = Location::visit_node(items, world, region, link_node, state)
                             {
                                 locations.append(&mut new_locations);
                             }
@@ -116,10 +152,10 @@ impl<'a> Location<'a>
         }
     }
 
-    fn can_access(items: &HashSet<String>, node: &Node) -> bool
+    fn can_access(items: &HashSet<String>, region: &Region, node: &Node, state: &mut State) -> bool
     {
         (match &node.interactionRequires {
-            Some(r) => r.check(items),
+            Some(r) => r.check(items, state),
             None => true
         } &&
         match &node.locks {
@@ -129,11 +165,11 @@ impl<'a> Location<'a>
                     Some(_r) => true,
                     None => {
                         (match &lock.unlockStrats {
-                            Some(us) => us.iter().any(|s| Location::can_do_strat(items, s)),
+                            Some(us) => us.iter().any(|s| Location::can_do_strat(items, region, s, state)),
                             None => true
                         } ||
                         match &lock.bypassStrats {
-                            Some(bs) => bs.iter().any(|s| Location::can_do_strat(items, s)),
+                            Some(bs) => bs.iter().any(|s| Location::can_do_strat(items, region, s, state)),
                             None => false
                         })
                     }
@@ -143,30 +179,36 @@ impl<'a> Location<'a>
         })
     }
 
-    fn can_traverse(items: &HashSet<String>, link: &LinkTo) -> bool
+    fn can_traverse(items: &HashSet<String>, region: &Region, link: &LinkTo, state: &mut State) -> bool
     {        
         match &link.strats {
-            Some(strats) => strats.iter().any(|s| Location::can_do_strat(items, s)),
+            Some(strats) => strats.iter().any(|s| Location::can_do_strat(items, region, s, state)),
             None => true
         }
     }
 
-    fn can_do_strat(items: &HashSet<String>, strat: &Strat) -> bool
+    fn can_do_strat(items: &HashSet<String>, region: &Region, strat: &Strat, state: &mut State) -> bool
     {
         (match &strat.requires {
-            Some(r) => r.check(items),
+            Some(r) => r.check(items, state),
             None => true
         } && match &strat.obstacles {
             Some(ob) => {
-                ob.iter().any(|o| 
-                    match &o.requires {
-                        Some(r) => r.check(items),
+                ob.iter().any(|o| state.obstacles.contains(&(region.id, o.id.as_ref().unwrap().to_string())) ||
+                    (match &o.requires {
+                        Some(r) => {
+                            match r.check(items, state)
+                            {
+                                true => state.obstacles.insert((region.id, o.id.as_ref().unwrap().to_string())) && true,
+                                false => false
+                            }
+                        },
                         None => true
                     } || 
                     match &o.bypass {
-                        Some(b) => b.check(items),
+                        Some(b) => b.check(items, state),
                         None => false
-                    }
+                    })
                 )                                
             },
             None => true
