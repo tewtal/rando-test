@@ -72,6 +72,8 @@ pub struct AmmoDrain
 pub struct EnemyKill
 {
     pub enemies: Vec<Vec<String>>,
+    pub explicitWeapons: Option<Vec<String>>,
+    pub excludedWeapons: Option<Vec<String>>
 }
 
 
