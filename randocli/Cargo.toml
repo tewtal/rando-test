@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 randolib = { path = "../randolib" }
+measure_time = "0.6"

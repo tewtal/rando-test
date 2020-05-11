@@ -1,6 +1,5 @@
 use serde_derive::{Serialize, Deserialize};
-use crate::requirement::Requirement;
-use crate::region::Note;
+use crate::link::Strat;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Sparking
@@ -13,8 +12,9 @@ pub struct Sparking
 pub struct Runway
 {
     pub length: i64,
-    pub requires: Option<Requirement>,
-    pub note: Option<Note>
+    pub strats: Option<Vec<Strat>>,
+    pub usableComingIn: Option<bool>,
+    pub openEnd: i64
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -22,7 +22,8 @@ pub struct CanLeaveCharged
 {
     pub usedTiles: i64,
     pub framesRemaining: i64,
-    pub requires: Option<Requirement>
+    pub strats: Option<Vec<Strat>>,
+    pub openEnd: i64
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]

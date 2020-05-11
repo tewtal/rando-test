@@ -11,6 +11,7 @@ pub struct State
     pub obstacles: HashSet<(i64, String)>,
     pub nodes: HashSet<(i64, i64)>,
     pub start: (i64, i64),
+    pub backtracking: bool
 }
 
 impl State
@@ -22,7 +23,8 @@ impl State
             events: HashSet::new(),
             obstacles: HashSet::new(),
             nodes: HashSet::new(),
-            start: (start_region, start_node)
+            start: (start_region, start_node),
+            backtracking: false
         }
     }
 }
@@ -48,14 +50,19 @@ impl<'a> Location<'a>
         while pass == 1 || state.events.len() > oldEvents {
             oldEvents = state.events.len();
             pass += 1;
-            locations = Location::visit_node(items, world, from_region, from_node, from_node, &mut state).unwrap_or(Vec::new());
+            locations = Location::visit_node(items, world, from_region, from_node, from_node, &mut state).unwrap_or_default();
             state.nodes = HashSet::new();
         }
 
         Some(locations)
     }
 
-    fn visit_node(items: &HashSet<String>, world: &'a World, region: &'a Region, node: &'a Node, prevNode: &'a Node, state: &mut State) -> Option<Vec<Location<'a>>>
+    pub fn available_with_state(items: &HashSet<String>, world: &'a World, from_region: &'a Region, from_node: &'a Node, state: &mut State) -> Option<Vec<Location<'a>>>
+    {        
+        Some(Location::visit_node(items, world, from_region, from_node, from_node, state).unwrap_or_default())
+    }
+
+    fn visit_node(items: &HashSet<String>, world: &'a World, region: &'a Region, node: &'a Node, _prevNode: &'a Node, state: &mut State) -> Option<Vec<Location<'a>>>
     {
         //print!("Visiting {}: {}\n", &region.name, &node.name);
         state.nodes.insert((region.id, node.id));
@@ -72,50 +79,47 @@ impl<'a> Location<'a>
         if let Some(nodeType) = &node.nodeType
         {
             /* If it's an item, add it to our item location collection */
-            if nodeType == &NodeType::Item
-            {
-                if Location::can_unlock(items, world, region, node, state)
-                {
-                    //print!("Visiting {}: {}\n", &region.name, &node.name);
-                    /* try to backtrack to the starting node from here */
-                    // let (start_region, start_node) = state.start;                    
-                    // let mut backtrackState: State = State::new(start_region, start_node);
-                    // backtrackState.events = state.events.iter().cloned().collect();
-                    // backtrackState.obstacles = state.obstacles.iter().cloned().collect();
+            if nodeType == &NodeType::Item && Location::can_unlock(items, world, region, node, state) {
+                if !state.backtracking {
+                    let (start_region, start_node) = state.start;
+                    let mut backtrack_state = state.clone();
+                    backtrack_state.nodes = HashSet::new();
+                    backtrack_state.obstacles = state.obstacles.iter().filter(|(o, _)| o == &region.id).cloned().collect();
+                    backtrack_state.start = (region.id, node.id);
+                    backtrack_state.backtracking = true;
+                    if let Some(backtrack_locations) = Location::available_with_state(items, world, region, node, &mut backtrack_state) {
+                        if backtrack_locations.iter().any(|l| l.region.id == start_region && l.node.id == start_node) {
+                            let location = Location
+                            {
+                                name: node.name.to_string(),
+                                region,
+                                node,
+                            };
+        
+                            locations.push(location);    
+                        }
+                    }
+                } else {
+                    let location = Location
+                    {
+                        name: node.name.to_string(),
+                        region,
+                        node,
+                    };
 
-                    // if Location::backtrack(items, world, region, node, &mut backtrackState)
-                    // {
-                        let location = Location
-                        {
-                            name: format!("{}", node.name),
-                            region: region,
-                            node: node,
-                        };
-
-                        locations.push(location);
-                    // }
+                    locations.push(location);    
                 }
             }
 
             /* If it's a door or exit, find the connecting node and visit it */
-            if nodeType == &NodeType::Door || nodeType == &NodeType::Exit
-            {
-                if Location::can_unlock(items, world, region, node, state)
-                {
-                    if let Some(connection) = world.connections.iter().find(|c| c.nodes.iter().any(|cn| cn.roomid == region.id && cn.nodeid == node.id))
-                    {
-                        if let Some(connection_node) = connection.nodes.iter().find(|cn| cn.roomid != region.id)
-                        {
-                            if let Some(target_region) = world.regions.iter().find(|r| r.id == connection_node.roomid)
-                            {
-                                if let Some(target_node) = target_region.nodes.iter().find(|n| n.id == connection_node.nodeid)
-                                {
-                                    if !state.nodes.contains(&(target_region.id, target_node.id))
-                                    {
-                                        if let Some(mut new_locations) = Location::visit_node(items, world, target_region, target_node, node, state)
-                                        {
-                                            locations.append(&mut new_locations);
-                                        }
+            if (nodeType == &NodeType::Door || nodeType == &NodeType::Exit) && Location::can_unlock(items, world, region, node, state) {
+                if let Some(connection) = world.connections.iter().find(|c| c.nodes.iter().any(|cn| cn.roomid == region.id && cn.nodeid == node.id)) {
+                    if let Some(connection_node) = connection.nodes.iter().find(|cn| !(cn.roomid == region.id && cn.nodeid == node.id)) {
+                        if let Some(target_region) = world.regions.iter().find(|r| r.id == connection_node.roomid) {
+                            if let Some(target_node) = target_region.nodes.iter().find(|n| n.id == connection_node.nodeid) {
+                                if !state.nodes.contains(&(target_region.id, target_node.id)) {
+                                    if let Some(mut new_locations) = Location::visit_node(items, world, target_region, target_node, node, state) {
+                                        locations.append(&mut new_locations);
                                     }
                                 }
                             }
@@ -126,44 +130,31 @@ impl<'a> Location<'a>
         }
 
         /* Find the in-room links for this node */
-        if let Some(links) = region.links.iter().find(|l| l.from == node.id)
-        {
-            for link in &links.to
-            {
-                if let Some(link_node) = region.nodes.iter().find(|n| n.id == link.id)
-                {
-                    if !state.nodes.contains(&(region.id, link_node.id))
-                    {
-                        if Location::can_traverse(items, world, region, &link, state) && Location::can_access(items, world, region, &link_node, state)
-                        {
-                            if let Some(mut new_locations) = Location::visit_node(items, world, region, link_node, node, state)
-                            {
-                                locations.append(&mut new_locations);
-                            }
+        if let Some(links) = region.links.iter().find(|l| l.from == node.id) {
+            for link in &links.to {
+                if let Some(link_node) = region.nodes.iter().find(|n| n.id == link.id) {
+                    if !state.nodes.contains(&(region.id, link_node.id)) && Location::can_traverse(items, world, region, &link, state) && Location::can_access(items, world, region, &link_node, state) {
+                        if let Some(mut new_locations) = Location::visit_node(items, world, region, link_node, node, state) {
+                            locations.append(&mut new_locations);
                         }
                     }                     
                 }
             }
         }
         
-        if locations.len() > 0
-        {
+        if !locations.is_empty() {
             Some(locations)
-        }
-        else
-        {
+        } else {
             None
         }
     }
 
-    fn can_unlock(items: &HashSet<String>, world: &World, region: &Region, node: &Node, state: &mut State) -> bool
-    {
+    fn can_unlock(items: &HashSet<String>, world: &World, region: &Region, node: &Node, state: &mut State) -> bool {
         match &node.locks {
             Some(locks) => locks.iter().all(|lock|
-                match &lock.lock
-                {
+                match &lock.lock {
                     Some(_r) => true,
-                    None => {
+                    None => 
                         (match &lock.unlockStrats {
                             Some(us) => us.iter().any(|s| Location::can_do_strat(items, world, region, s, state)),
                             None => true
@@ -171,44 +162,42 @@ impl<'a> Location<'a>
                         match &lock.bypassStrats {
                             Some(bs) => bs.iter().any(|s| Location::can_do_strat(items, world, region, s, state)),
                             None => false
-                        })
-                    }
+                        })                    
                 }
             ),
             None => true
         }
     }
 
-    fn can_access(items: &HashSet<String>, world: &World, region: &Region, node: &Node, state: &mut State) -> bool
-    {
+    fn can_access(items: &HashSet<String>, world: &World, _region: &Region, node: &Node, state: &mut State) -> bool {
         match &node.interactionRequires {
             Some(r) => r.check(items, world, state),
             None => true
         }
     }
 
-    fn can_traverse(items: &HashSet<String>, world: &World, region: &Region, link: &LinkTo, state: &mut State) -> bool
-    {        
+    fn can_traverse(items: &HashSet<String>, world: &World, region: &Region, link: &LinkTo, state: &mut State) -> bool {        
         match &link.strats {
             Some(strats) => strats.iter().any(|s| Location::can_do_strat(items, world, region, s, state)),
             None => true
         }
     }
 
-    fn can_do_strat(items: &HashSet<String>, world: &World, region: &Region, strat: &Strat, state: &mut State) -> bool
-    {
-        (match &strat.requires {
+    fn can_do_strat(items: &HashSet<String>, world: &World, region: &Region, strat: &Strat, state: &mut State) -> bool {
+        let requires = match &strat.requires {
             Some(r) => r.check(items, world, state),
             None => true
-        } && match &strat.obstacles {
+        };
+
+        let obstacles = match &strat.obstacles {
             Some(ob) => {
                 ob.iter().all(|o| state.obstacles.contains(&(region.id, o.id.as_ref().unwrap().to_string())) ||
                     (match &o.requires {
                         Some(r) => {
-                            match r.check(items, world, state)
-                            {
-                                true => state.obstacles.insert((region.id, o.id.as_ref().unwrap().to_string())) && true,
-                                false => false
+                            if r.check(items, world, state) {
+                                state.obstacles.insert((region.id, o.id.as_ref().unwrap().to_string())) && true
+                            } else {
+                                false
                             }
                         },
                         None => true
@@ -220,6 +209,8 @@ impl<'a> Location<'a>
                 )                                
             },
             None => true
-        })
+        };
+
+        requires && obstacles
     }
 }

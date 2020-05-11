@@ -10,8 +10,7 @@ use crate::enemy::Enemy;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 #[serde(untagged)]
-pub enum Requirement
-{
+pub enum Requirement {
     Or { or: Vec<Requirement> },
     ExplicitAnd { and: Vec<Requirement> },
     Not { not: Vec<Requirement> },
@@ -38,10 +37,8 @@ pub enum Requirement
     None
 }
 
-impl Requirement
-{
-    pub fn check(&self, items: &HashSet<String>, world: &World, state: &State) -> bool
-    {
+impl Requirement {
+    pub fn check(&self, items: &HashSet<String>, world: &World, state: &State) -> bool {
         match self {
             Requirement::Or { or: reqs } => reqs.iter().any(|r| r.check(items, world, state)),
             Requirement::ExplicitAnd { and: reqs} => reqs.iter().all(|r| r.check(items, world, state)),
@@ -54,10 +51,9 @@ impl Requirement
             Requirement::ResetRoom { resetRoom: _rr } => true,
             Requirement::Ammo { ammo : _a } => true,
             Requirement::PreviousNode { previousNode: _p } => true,
-            Requirement::SpikeHits { spikeHits: s } => items.contains("EnergyTank"),
+            Requirement::SpikeHits { spikeHits: _s } => items.contains("EnergyTank"),
             Requirement::EnemyKill { enemyKill: e } => {
                 let weapons = &world.weapons.iter().filter(|w| !w.situational && w.useRequires.check(items, world, state)).collect::<Vec<&Weapon>>();
-                let weaponCategories = weapons.iter().flat_map(|w| &w.categories).collect::<Vec<&String>>();
                 let weaponNames = weapons.iter().map(|w| &w.name).collect::<Vec<&String>>();
 
                 if let Some(explicitWeapons) = &e.explicitWeapons {
@@ -66,10 +62,10 @@ impl Requirement
                     }
                 }
 
-                let enemies = &e.enemies.iter().flat_map(|e| e).filter(|e| world.enemies.iter().any(|we| we.name == **e)).map(|e| world.enemies.iter().find(|we| we.name == *e).unwrap()).collect::<Vec<&Enemy>>();
+                let enemies = &e.enemies.iter().flatten().filter(|e| world.enemies.iter().any(|we| we.name == **e)).map(|e| world.enemies.iter().find(|we| we.name == *e).unwrap()).collect::<Vec<&Enemy>>();
                 let invulns = enemies.iter().flat_map(|e| e.invul.as_ref().unwrap_or(&vec![]).to_owned()).collect::<Vec<String>>();
 
-                if invulns.len() == 0 {
+                if invulns.is_empty() {
                     return true;
                 }
                 
@@ -92,13 +88,7 @@ impl Requirement
             Requirement::PreviousStratProperty { previousStratProperty: _p } => true,
             Requirement::AmmoDrain { ammoDrain: _a } => true,
             Requirement::And(reqs) => { reqs.iter().all(|r| r.check(items, world, state)) },
-            Requirement::Req(r) => {
-                let ok = items.contains(r) || state.events.contains(r);
-                // if !ok {
-                //     print!("Unmet requirement: {}\n", r);
-                // }
-                ok
-            },
+            Requirement::Req(r) => { items.contains(r) || state.events.contains(r) },
             Requirement::None => true
         }
     }

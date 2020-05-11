@@ -8,7 +8,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
-            "program": "${workspaceFolder}/randocli/target/debug/randocli.exe",
+            "program": "${workspaceFolder}/randocli/target/debug/randocli",
             "args": [],
             "cwd": "${workspaceFolder}/randocli",
             "sourceLanguages": ["rust"]
